@@ -177,7 +177,13 @@ class CompanyViewSet(viewsets.ModelViewSet):
         ).distinct()
 
     def perform_create(self, serializer):
-        serializer.save(created_by=self.request.user)
+        import logging
+        logger = logging.getLogger('ledger')
+        try:
+            serializer.save(created_by=self.request.user)
+        except Exception as e:
+            logger.error(f'Error creating company: {str(e)}', exc_info=True)
+            raise
 
 
 class DirectorViewSet(viewsets.ModelViewSet):

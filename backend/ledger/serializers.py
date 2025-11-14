@@ -79,6 +79,7 @@ class LoginSerializer(serializers.Serializer):
 class CompanySerializer(serializers.ModelSerializer):
     created_by_name = serializers.CharField(source='created_by.username', read_only=True)
     directors_count = serializers.SerializerMethodField()
+    incorporation_date = serializers.DateField(required=False, allow_null=True)
 
     class Meta:
         model = Company
@@ -87,6 +88,12 @@ class CompanySerializer(serializers.ModelSerializer):
 
     def get_directors_count(self, obj):
         return obj.directors.count()
+
+    def to_internal_value(self, data):
+        # Handle empty string for incorporation_date before validation
+        if 'incorporation_date' in data and (data['incorporation_date'] == '' or data['incorporation_date'] is None):
+            data['incorporation_date'] = None
+        return super().to_internal_value(data)
 
 
 class DirectorSerializer(serializers.ModelSerializer):
