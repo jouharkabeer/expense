@@ -218,6 +218,31 @@ body {
   line-height: 1;
 }
 
+/* Mobile Logout Button */
+.btn-logout-mobile {
+  display: none;
+  background: rgba(239, 68, 68, 0.1);
+  border: 1px solid rgba(239, 68, 68, 0.3);
+  color: var(--danger);
+  border-radius: 12px;
+  padding: 10px 14px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  font-size: 20px;
+  line-height: 1;
+}
+
+.btn-logout-mobile:hover {
+  background: rgba(239, 68, 68, 0.2);
+  border-color: rgba(239, 68, 68, 0.5);
+  transform: scale(1.05);
+}
+
+.logout-icon {
+  display: block;
+  font-size: 20px;
+}
+
 @media (max-width: 767px) {
   .topbar .nav {
     display: none;
@@ -225,6 +250,10 @@ body {
   
   .topbar .btn.secondary {
     display: none;
+  }
+  
+  .btn-logout-mobile {
+    display: block;
   }
   
   .bottom-nav {

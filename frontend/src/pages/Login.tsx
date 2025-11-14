@@ -137,7 +137,7 @@ export default function Login() {
           </button>
         </form>
 
-        <div style={{ marginTop: 24, textAlign: 'center' }}>
+        {/* <div style={{ marginTop: 24, textAlign: 'center' }}>
           <button
             type="button"
             onClick={() => {
@@ -160,7 +160,7 @@ export default function Login() {
           >
             {isRegister ? 'Already have an account? Sign in' : 'Need an account? Sign up'}
           </button>
-        </div>
+        </div> */}
 
         {error && (
           <div className="message error" style={{ marginTop: 16 }}>

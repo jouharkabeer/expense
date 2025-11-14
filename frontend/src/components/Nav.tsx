@@ -25,6 +25,16 @@ export default function Nav() {
           <Link to="/" className="brand" aria-label="Lsofito innovations home">
             <img src="/image.png" alt="Lsofito innovations" className="brand-logo" />
           </Link>
+          {user && (
+            <button 
+              className="btn-logout-mobile" 
+              onClick={handleLogout} 
+              aria-label="Logout"
+              title="Logout"
+            >
+              <span className="logout-icon">🚪</span>
+            </button>
+          )}
           <nav className="nav">
             {user && (
               <>
