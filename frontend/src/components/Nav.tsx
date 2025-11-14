@@ -89,39 +89,37 @@ export default function Nav() {
           </nav>
           {user && (
             <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-              {pendingCount > 0 && (
-                <button 
-                  className="btn secondary" 
-                  onClick={() => navigate('/')}
-                  style={{ 
-                    fontSize: '14px', 
-                    padding: '10px 16px',
-                    position: 'relative'
-                  }}
-                  title={`${pendingCount} pending approval${pendingCount > 1 ? 's' : ''}`}
-                >
-                  🔔
-                  {pendingCount > 0 && (
-                    <span style={{
-                      position: 'absolute',
-                      top: '-4px',
-                      right: '-4px',
-                      background: 'var(--danger)',
-                      color: 'white',
-                      borderRadius: '50%',
-                      width: '20px',
-                      height: '20px',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      fontSize: '11px',
-                      fontWeight: 'bold'
-                    }}>
-                      {pendingCount > 9 ? '9+' : pendingCount}
-                    </span>
-                  )}
-                </button>
-              )}
+              <button 
+                className="btn secondary" 
+                onClick={() => navigate('/')}
+                style={{ 
+                  fontSize: '14px', 
+                  padding: '10px 16px',
+                  position: 'relative'
+                }}
+                title={pendingCount > 0 ? `${pendingCount} pending approval${pendingCount > 1 ? 's' : ''}` : 'No pending approvals'}
+              >
+                🔔
+                {pendingCount > 0 && (
+                  <span style={{
+                    position: 'absolute',
+                    top: '-4px',
+                    right: '-4px',
+                    background: 'var(--danger)',
+                    color: 'white',
+                    borderRadius: '50%',
+                    width: '20px',
+                    height: '20px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    fontSize: '11px',
+                    fontWeight: 'bold'
+                  }}>
+                    {pendingCount > 9 ? '9+' : pendingCount}
+                  </span>
+                )}
+              </button>
               <button className="btn secondary" onClick={handleLogout} style={{ fontSize: '14px', padding: '10px 16px' }}>
                 Logout
               </button>

@@ -1,5 +1,5 @@
 import { FormEvent, useEffect, useState } from 'react'
-import { Account, listSalaries, createSalary, listCompanies, listDirectors, Salary as SalaryType, Company, Director, approveSalary, rejectSalary } from '../api'
+import { Account, listSalaries, createSalary, listCompanies, listDirectors, Salary as SalaryType, Company, Director, approveSalary, rejectSalary, deleteSalary } from '../api'
 import { getCurrentUserSync } from '../auth'
 import Modal from '../components/Modal'
 
@@ -123,6 +123,16 @@ export default function Salary() {
     }
   }
 
+  async function handleDelete(id: number) {
+    if (!confirm('Are you sure you want to delete this rejected salary entry?')) return
+    try {
+      await deleteSalary(id)
+      await loadSalaries()
+    } catch (e: any) {
+      setError((e as Error).message)
+    }
+  }
+
   if (companies.length === 0) {
     return (
       <div className="panel">
@@ -231,12 +241,17 @@ export default function Salary() {
                         </span>
                       </td>
                       <td>
-                        {s.status === 'PENDING' && user && s.created_by !== user.id && (
-                          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-                            <button className="btn secondary small" onClick={() => handleApprove(s.id!)}>Approve</button>
-                            <button className="btn danger small" onClick={() => handleReject(s.id!)}>Reject</button>
-                          </div>
-                        )}
+                        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                          {s.status === 'PENDING' && user && s.created_by !== user.id && (
+                            <>
+                              <button className="btn secondary small" onClick={() => handleApprove(s.id!)}>Approve</button>
+                              <button className="btn danger small" onClick={() => handleReject(s.id!)}>Reject</button>
+                            </>
+                          )}
+                          {s.status === 'REJECTED' && (
+                            <button className="btn danger small" onClick={() => handleDelete(s.id!)}>Delete</button>
+                          )}
+                        </div>
                       </td>
                     </tr>
                   ))

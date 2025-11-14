@@ -120,6 +120,7 @@ export default function Dashboard() {
         <Card label="Total Balance" value={summary.total_balance} />
         <Card label="Total Income" value={summary.income_total} />
         <Card label="Total Expense" value={summary.expense_total} />
+        <Card label="Total Salary" value={summary.salary_total} />
       </div>
       
       <h3>Account Balances</h3>

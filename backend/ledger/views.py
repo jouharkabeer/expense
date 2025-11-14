@@ -596,6 +596,9 @@ def summary(request):
     # Only count approved transactions
     transactions = Transaction.objects.filter(company=company, status='APPROVED')
     
+    # Get approved salaries (from Salary model, not Transaction)
+    approved_salaries = Salary.objects.filter(company=company, status='APPROVED')
+    
     income_total = (
         transactions.filter(transaction_type='INCOME').aggregate(total=Sum('amount'))['total']
         or Decimal('0')
@@ -605,19 +608,24 @@ def summary(request):
         or Decimal('0')
     )
     salary_total = (
-        transactions.filter(transaction_type='SALARY').aggregate(total=Sum('amount'))['total']
+        approved_salaries.aggregate(total=Sum('amount'))['total']
         or Decimal('0')
     )
 
     def account_balance(account_code: str) -> Decimal:
+        # Calculate from transactions
         agg = transactions.filter(account=account_code).aggregate(
             inc=Sum(Case(When(transaction_type='INCOME', then=F('amount')), output_field=DecimalField())),
             exp=Sum(Case(When(transaction_type='EXPENSE', then=F('amount')), output_field=DecimalField())),
-            sal=Sum(Case(When(transaction_type='SALARY', then=F('amount')), output_field=DecimalField())),
         )
         inc = agg['inc'] or Decimal('0')
         exp = agg['exp'] or Decimal('0')
-        sal = agg['sal'] or Decimal('0')
+        
+        # Subtract salaries from the account where they are debited
+        sal = approved_salaries.filter(account=account_code).aggregate(
+            total=Sum('amount')
+        )['total'] or Decimal('0')
+        
         return inc - exp - sal
 
     company_bal = account_balance('COMPANY')
@@ -648,7 +656,8 @@ def summary(request):
     if len(director_balances) > 1:
         director_balances[1]['balance'] = str(partner2)
     
-    total_balance = partner1 + partner2 + company_bal
+    # Total balance = income - expenses - salaries
+    total_balance = income_total - expense_total - salary_total
 
     # Get last 3 incomplete milestones
     incomplete_milestones = Milestone.objects.filter(

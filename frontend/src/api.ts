@@ -571,3 +571,10 @@ export async function rejectSalary(id: number): Promise<Salary> {
   if (!res.ok) throw new Error('Failed to reject salary')
   return res.json()
 }
+
+export async function deleteSalary(id: number): Promise<void> {
+  const res = await authFetch(BASE_URL + `/salaries/${id}/`, {
+    method: 'DELETE',
+  })
+  if (!res.ok) throw new Error('Failed to delete salary')
+}
