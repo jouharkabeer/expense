@@ -1,6 +1,7 @@
 import { FormEvent, useEffect, useState } from 'react'
 import { Account, listSalaries, createSalary, listCompanies, listDirectors, Salary as SalaryType, Company, Director } from '../api'
 import { getCurrentUserSync } from '../auth'
+import Modal from '../components/Modal'
 
 export default function Salary() {
   const [user] = useState(getCurrentUserSync())
@@ -10,6 +11,7 @@ export default function Salary() {
   const [selectedCompany, setSelectedCompany] = useState<number | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [showModal, setShowModal] = useState(false)
   const [form, setForm] = useState<Pick<SalaryType, 'amount' | 'description' | 'date' | 'account' | 'director'>>({
     amount: '',
     description: '',
@@ -90,6 +92,7 @@ export default function Salary() {
         company: selectedCompany,
       } as SalaryType)
       setForm({ amount: '', description: '', date: new Date().toISOString().slice(0, 10), account: 'COMPANY', director: directors[0]?.id || 0 })
+      setShowModal(false)
       loadSalaries()
     } catch (e: any) {
       setError(e.message)
@@ -99,20 +102,32 @@ export default function Salary() {
   }
 
   if (companies.length === 0) {
-    return <div className="panel"><p>No companies found. Please contact your administrator.</p></div>
+    return (
+      <div className="panel">
+        <p style={{ textAlign: 'center', color: 'var(--text-muted)' }}>
+          No companies found. Please contact your administrator.
+        </p>
+      </div>
+    )
   }
 
   return (
-    <div>
-      <h2 style={{ marginTop: 0 }}>Salary</h2>
+    <div className="fade-in">
+      <h2>Salary</h2>
       
       {selectedCompany && companies.find(c => c.id === selectedCompany) && (
-        <div className="panel" style={{ marginBottom: 16 }}>
-          <p style={{ margin: 0, fontWeight: 500 }}>Company: {companies.find(c => c.id === selectedCompany)?.name}</p>
+        <div className="panel" style={{ marginBottom: 24, background: 'rgba(139, 92, 246, 0.1)', borderColor: 'rgba(139, 92, 246, 0.3)' }}>
+          <p style={{ margin: 0, fontWeight: 600, color: 'var(--secondary)' }}>
+            Company: {companies.find(c => c.id === selectedCompany)?.name}
+          </p>
         </div>
       )}
 
-      <div className="panel" style={{ marginBottom: 16 }}>
+      <button className="btn" onClick={() => setShowModal(true)} style={{ marginBottom: 24 }}>
+        Add Salary
+      </button>
+
+      <Modal isOpen={showModal} onClose={() => { setShowModal(false); setError(null) }} title="Add Salary Entry">
         <form onSubmit={onSubmit} className="form">
           <select className="select" value={form.director} onChange={(e) => setForm({ ...form, director: Number(e.target.value) })} required>
             <option value={0}>Select Director</option>
@@ -120,10 +135,11 @@ export default function Salary() {
               <option key={d.id} value={d.id}>{d.user.username}</option>
             ))}
           </select>
-          <input className="input" placeholder="Amount" type="number" step="0.01" required value={form.amount}
+          <input className="input" placeholder="Amount (₹)" type="number" step="0.01" required value={form.amount}
                  onChange={(e) => setForm({ ...form, amount: e.target.value })} />
           <input className="input" placeholder="Description" value={form.description}
                  onChange={(e) => setForm({ ...form, description: e.target.value })} />
+          <label style={{ color: 'var(--text-secondary)', fontSize: 14, fontWeight: 500 }}>Date *</label>
           <input className="input" type="date" required value={form.date}
                  onChange={(e) => setForm({ ...form, date: e.target.value })} />
           <select className="select" required value={form.account}
@@ -135,44 +151,62 @@ export default function Salary() {
               </option>
             ))}
           </select>
-          <button className="btn" type="submit" disabled={loading}>{loading ? 'Saving...' : 'Add Salary'}</button>
+          {error && <div className="message error">{error}</div>}
+          <div style={{ display: 'flex', gap: 12, marginTop: 16 }}>
+            <button className="btn" type="submit" disabled={loading} style={{ flex: 1 }}>
+              {loading ? 'Saving...' : 'Add Salary'}
+            </button>
+            <button className="btn secondary" type="button" onClick={() => { setShowModal(false); setError(null) }} style={{ flex: 1 }}>
+              Cancel
+            </button>
+          </div>
         </form>
-        {error && <div style={{ color: '#ff7a90', marginTop: 12 }}>{error}</div>}
-      </div>
+      </Modal>
 
       <div className="panel">
-        <table>
-          <thead>
-            <tr>
-              <th>Date</th>
-              <th>Director</th>
-              <th>Amount</th>
-              <th>Description</th>
-              <th>Account</th>
-              <th>Status</th>
-            </tr>
-          </thead>
-          <tbody>
-            {salaries.map(s => (
-              <tr key={s.id}>
-                <td>{s.date}</td>
-                <td>{s.director_name}</td>
-                <td>₹ {Number(s.amount).toFixed(2)}</td>
-                <td>{s.description}</td>
-                <td>
-                  <span className={`chip ${s.account === 'PARTNER1' ? 'p1' : s.account === 'PARTNER2' ? 'p2' : 'company'}`}>
-                    {getAccountLabel(s.account)}
-                  </span>
-                </td>
-                <td>
-                  <span className={`chip ${s.status === 'APPROVED' ? 'company' : s.status === 'REJECTED' ? 'p2' : 'p1'}`}>
-                    {s.status}
-                  </span>
-                </td>
+        <h3 style={{ marginTop: 0, marginBottom: 20 }}>Salary Transactions</h3>
+        <div style={{ overflowX: 'auto' }}>
+          <table>
+            <thead>
+              <tr>
+                <th>Date</th>
+                <th>Director</th>
+                <th>Amount</th>
+                <th>Description</th>
+                <th>Account</th>
+                <th>Status</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {salaries.length === 0 ? (
+                <tr>
+                  <td colSpan={6} style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)' }}>
+                    No salary transactions yet
+                  </td>
+                </tr>
+              ) : (
+                salaries.map(s => (
+                  <tr key={s.id}>
+                    <td>{s.date}</td>
+                    <td style={{ fontWeight: 600 }}>{s.director_name}</td>
+                    <td style={{ fontWeight: 600, color: 'var(--warning)' }}>₹ {Number(s.amount).toFixed(2)}</td>
+                    <td>{s.description || '-'}</td>
+                    <td>
+                      <span className={`chip ${s.account === 'PARTNER1' ? 'p1' : s.account === 'PARTNER2' ? 'p2' : 'company'}`}>
+                        {getAccountLabel(s.account)}
+                      </span>
+                    </td>
+                    <td>
+                      <span className={`chip ${s.status === 'APPROVED' ? 'company' : s.status === 'REJECTED' ? 'p2' : 'p1'}`}>
+                        {s.status}
+                      </span>
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
       </div>
     </div>
   )

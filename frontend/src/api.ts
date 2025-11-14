@@ -31,6 +31,7 @@ export interface Company {
   created_by: number
   created_by_name: string
   created_at: string
+  incorporation_date?: string
   partner1_name: string
   partner2_name: string
   directors_count: number
@@ -62,6 +63,7 @@ export interface Project {
   approvals: ProjectApproval[]
   all_approved: boolean
   pending_count: number
+  profit?: number
 }
 
 export interface ProjectApproval {
@@ -130,17 +132,31 @@ export interface Summary {
   partner2_balance: string
   company_balance: string
   director_balances?: Array<{ director_id: number; director_name: string; balance: string }>
-  milestones: Milestone[]
+  milestones: Array<{
+    id?: number
+    target: number
+    label: string
+    achieved: boolean
+    days_taken?: number
+    achieved_at?: string
+    progress?: number
+  }>
   today: string
 }
 
 export interface Milestone {
-  target: number
+  id?: number
+  company?: number
+  company_name?: string
+  target_amount: number
   label: string
   achieved: boolean
-  days_taken?: number
-  achieved_date?: string
+  achieved_at?: string
+  created_by?: number
+  created_by_name?: string
+  created_at?: string
   progress?: number
+  days_taken?: number
 }
 
 // Token management
@@ -479,6 +495,41 @@ export async function createSalary(data: Salary): Promise<Salary> {
   })
   if (!res.ok) throw new Error('Failed to create salary')
   return res.json()
+}
+
+// Milestone APIs
+export async function listMilestones(companyId?: number): Promise<Milestone[]> {
+  const url = new URL(BASE_URL + '/milestones/')
+  if (companyId) url.searchParams.set('company', String(companyId))
+  const res = await authFetch(url.toString())
+  if (!res.ok) throw new Error('Failed to load milestones')
+  return res.json()
+}
+
+export async function createMilestone(data: { company: number; target_amount: number; label: string }): Promise<Milestone> {
+  const res = await authFetch(BASE_URL + '/milestones/', {
+    method: 'POST',
+    body: JSON.stringify(data),
+  })
+  if (!res.ok) {
+    const err = await res.json()
+    throw new Error(err.error || err.detail || 'Failed to create milestone')
+  }
+  return res.json()
+}
+
+export async function updateMilestone(id: number, data: Partial<Milestone>): Promise<Milestone> {
+  const res = await authFetch(BASE_URL + `/milestones/${id}/`, {
+    method: 'PATCH',
+    body: JSON.stringify(data),
+  })
+  if (!res.ok) throw new Error('Failed to update milestone')
+  return res.json()
+}
+
+export async function deleteMilestone(id: number): Promise<void> {
+  const res = await authFetch(BASE_URL + `/milestones/${id}/`, { method: 'DELETE' })
+  if (!res.ok) throw new Error('Failed to delete milestone')
 }
 
 // Summary API

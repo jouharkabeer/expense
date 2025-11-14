@@ -7,6 +7,7 @@ import Income from './pages/Income'
 import Expense from './pages/Expense'
 import Salary from './pages/Salary'
 import Projects from './pages/Projects'
+import Milestones from './pages/Milestones'
 import CompanySetup from './pages/CompanySetup'
 import SuperAdmin from './pages/SuperAdmin'
 import './styles.css'
@@ -23,6 +24,7 @@ const router = createBrowserRouter([
       { path: 'superadmin', element: <AuthGate><SuperAdmin /></AuthGate> },
       { path: 'company', element: <AuthGate><CompanySetup /></AuthGate> },
       { path: 'projects', element: <AuthGate><Projects /></AuthGate> },
+      { path: 'milestones', element: <AuthGate><Milestones /></AuthGate> },
       { path: 'income', element: <AuthGate><Income /></AuthGate> },
       { path: 'expense', element: <AuthGate><Expense /></AuthGate> },
       { path: 'salary', element: <AuthGate><Salary /></AuthGate> },

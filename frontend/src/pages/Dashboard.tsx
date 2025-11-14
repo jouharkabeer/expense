@@ -63,15 +63,15 @@ export default function Dashboard() {
     }
   }
 
-  if (error) return <div style={{ color: 'red', padding: 16 }}>{error}</div>
+  if (error) return <div className="message error">{error}</div>
 
   // Admin Dashboard
   if (isAdmin) {
-    if (!adminStats) return <div style={{ padding: 40, textAlign: 'center' }}>Loading...</div>
+    if (!adminStats) return <div className="loading">Loading...</div>
     
     return (
-      <div>
-        <h2 style={{ marginTop: 0, marginBottom: 16 }}>SuperAdmin Dashboard</h2>
+      <div className="fade-in">
+        <h2>SuperAdmin Dashboard</h2>
         <div className="cards">
           <Card label="Total Companies" value={adminStats.company_count.toString()} />
           <Card label="Total Directors" value={adminStats.director_count.toString()} />
@@ -82,29 +82,35 @@ export default function Dashboard() {
 
   // Director Dashboard
   if (loadingCompanies) {
-    return <div style={{ padding: 40, textAlign: 'center' }}>Loading...</div>
+    return <div className="loading">Loading...</div>
   }
   
   if (companies.length === 0) {
-    return <div className="panel"><p>No companies found. Please contact your administrator.</p></div>
+    return (
+      <div className="panel">
+        <p style={{ textAlign: 'center', color: 'var(--text-muted)' }}>
+          No companies found. Please contact your administrator.
+        </p>
+      </div>
+    )
   }
 
-  if (!summary) return <div style={{ padding: 40, textAlign: 'center' }}>Loading summary...</div>
+  if (!summary) return <div className="loading">Loading summary...</div>
 
   return (
-    <div>
-      <h2 style={{ marginTop: 0, marginBottom: 16 }}>Dashboard</h2>
+    <div className="fade-in">
+      <h2>Dashboard</h2>
 
-      <div className="cards" style={{ marginBottom: 16 }}>
+      <div className="cards" style={{ marginBottom: 32 }}>
         <Card label="Total Balance" value={summary.total_balance} />
-        <Card label="Income" value={summary.income_total} />
-        <Card label="Expense" value={summary.expense_total} />
+        <Card label="Total Income" value={summary.income_total} />
+        <Card label="Total Expense" value={summary.expense_total} />
       </div>
       
-      <h3 style={{ marginTop: 0, marginBottom: 16 }}>Account Balance</h3>
-      <div className="cards" style={{ marginBottom: 16 }}>
+      <h3>Account Balances</h3>
+      <div className="cards" style={{ marginBottom: 32 }}>
         {summary.director_balances && summary.director_balances.length > 0 ? (
-          summary.director_balances.map((dir, idx) => (
+          summary.director_balances.map((dir) => (
             <Card key={dir.director_id} label={dir.director_name} value={dir.balance} />
           ))
         ) : (
@@ -116,34 +122,40 @@ export default function Dashboard() {
         <Card label="Company Account" value={summary.company_balance} />
       </div>
 
-      {summary.milestones && summary.milestones.length > 0 && (
+      {summary.milestones && summary.milestones.filter(m => !m.achieved).length > 0 && (
         <>
-          <h3 style={{ marginTop: 0, marginBottom: 16 }}>Milestones</h3>
-          <div className="cards">
-            {summary.milestones.map((m, idx) => (
-              <div key={idx} className="card">
-                <div className="label">{m.label}</div>
-                {m.achieved ? (
-                  <div>
-                    <div className="value" style={{ color: '#1fb978' }}>✓ Achieved</div>
-                    {m.days_taken !== undefined && (
-                      <div style={{ fontSize: 14, color: '#9aa4b2', marginTop: 4 }}>
-                        Time taken: {m.days_taken} days
-                      </div>
-                    )}
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+            <h3 style={{ margin: 0 }}>Recent Milestones</h3>
+          </div>
+          <div style={{ marginBottom: 24 }}>
+            {summary.milestones
+              .filter(m => !m.achieved)
+              .slice(0, 3)
+              .map((m, idx) => (
+                <div key={m.id || idx} className="progress-container">
+                  <div className="progress-header">
+                    <div className="progress-label">{m.label}</div>
+                    <div className="progress-value">
+                      {m.progress !== undefined ? `${m.progress.toFixed(1)}%` : '0%'}
+                    </div>
                   </div>
-                ) : (
-                  <div>
-                    <div className="value">₹ {m.target.toLocaleString()}</div>
+                  <div className="progress-bar-wrapper">
+                    <div 
+                      className="progress-bar" 
+                      style={{ 
+                        width: `${m.progress || 0}%`,
+                        background: 'var(--gradient-primary)'
+                      }}
+                    />
+                  </div>
+                  <div className="progress-info">
+                    <span>Target: ₹{m.target.toLocaleString()}</span>
                     {m.progress !== undefined && (
-                      <div style={{ fontSize: 14, color: '#9aa4b2', marginTop: 4 }}>
-                        Progress: {m.progress.toFixed(1)}%
-                      </div>
+                      <span>Remaining: ₹{(m.target - (m.target * m.progress / 100)).toLocaleString()}</span>
                     )}
                   </div>
-                )}
-              </div>
-            ))}
+                </div>
+              ))}
           </div>
         </>
       )}

@@ -2,7 +2,7 @@ from rest_framework import serializers
 from django.contrib.auth import authenticate
 from .models import (
     User, Company, Director, Project, ProjectApproval,
-    Transaction, TransactionApproval, Salary
+    Transaction, TransactionApproval, Salary, Milestone
 )
 
 
@@ -82,7 +82,7 @@ class CompanySerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Company
-        fields = ['id', 'name', 'created_by', 'created_by_name', 'created_at', 'partner1_name', 'partner2_name', 'directors_count']
+        fields = ['id', 'name', 'created_by', 'created_by_name', 'created_at', 'incorporation_date', 'partner1_name', 'partner2_name', 'directors_count']
         read_only_fields = ['created_by', 'created_at']
 
     def get_directors_count(self, obj):
@@ -115,18 +115,34 @@ class ProjectSerializer(serializers.ModelSerializer):
     approvals = ProjectApprovalSerializer(many=True, read_only=True)
     all_approved = serializers.BooleanField(read_only=True)
     pending_count = serializers.SerializerMethodField()
+    profit = serializers.SerializerMethodField()
 
     class Meta:
         model = Project
         fields = [
             'id', 'company', 'company_name', 'name', 'start_date', 'end_date',
             'project_value', 'received_amount', 'status', 'created_by', 'created_by_name',
-            'created_at', 'updated_at', 'approvals', 'all_approved', 'pending_count'
+            'created_at', 'updated_at', 'approvals', 'all_approved', 'pending_count', 'profit'
         ]
         read_only_fields = ['created_by', 'created_at', 'updated_at', 'all_approved']
 
     def get_pending_count(self, obj):
         return obj.pending_approvals.count()
+
+    def get_profit(self, obj):
+        from django.db.models import Sum
+        from .models import Transaction
+        income = Transaction.objects.filter(
+            project=obj,
+            transaction_type='INCOME',
+            status='APPROVED'
+        ).aggregate(Sum('amount'))['amount__sum'] or 0
+        expense = Transaction.objects.filter(
+            project=obj,
+            transaction_type='EXPENSE',
+            status='APPROVED'
+        ).aggregate(Sum('amount'))['amount__sum'] or 0
+        return float(income) - float(expense)
 
 
 class TransactionApprovalSerializer(serializers.ModelSerializer):
@@ -175,3 +191,37 @@ class SalarySerializer(serializers.ModelSerializer):
             'created_at', 'status'
         ]
         read_only_fields = ['created_by', 'created_at', 'status']
+
+
+class MilestoneSerializer(serializers.ModelSerializer):
+    created_by_name = serializers.CharField(source='created_by.username', read_only=True)
+    company_name = serializers.CharField(source='company.name', read_only=True)
+    progress = serializers.SerializerMethodField()
+    days_taken = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Milestone
+        fields = [
+            'id', 'company', 'company_name', 'target_amount', 'label',
+            'achieved', 'achieved_at', 'created_by', 'created_by_name',
+            'created_at', 'progress', 'days_taken'
+        ]
+        read_only_fields = ['created_by', 'created_at', 'achieved', 'achieved_at']
+
+    def get_progress(self, obj):
+        from django.db.models import Sum
+        from .models import Transaction
+        total_income = Transaction.objects.filter(
+            company=obj.company,
+            transaction_type='INCOME',
+            status='APPROVED'
+        ).aggregate(Sum('amount'))['amount__sum'] or 0
+        if obj.target_amount > 0:
+            return min(100, (float(total_income) / float(obj.target_amount)) * 100)
+        return 0
+
+    def get_days_taken(self, obj):
+        if obj.achieved and obj.achieved_at and obj.company.incorporation_date:
+            delta = obj.achieved_at - obj.company.incorporation_date
+            return delta.days
+        return None

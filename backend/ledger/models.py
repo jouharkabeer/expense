@@ -20,6 +20,7 @@ class Company(models.Model):
     name = models.CharField(max_length=200)
     created_by = models.ForeignKey(User, on_delete=models.CASCADE, related_name='companies_created')
     created_at = models.DateTimeField(auto_now_add=True)
+    incorporation_date = models.DateField(null=True, blank=True)
     partner1_name = models.CharField(max_length=100, default='Jouhar')
     partner2_name = models.CharField(max_length=100, default='Aleena')
 
@@ -185,5 +186,21 @@ class Salary(models.Model):
 
     def __str__(self):
         return f"Salary {self.amount} for {self.director.user.username} on {self.date}"
+
+
+class Milestone(models.Model):
+    company = models.ForeignKey(Company, on_delete=models.CASCADE, related_name='milestones')
+    target_amount = models.DecimalField(max_digits=12, decimal_places=2, validators=[MinValueValidator(0)])
+    label = models.CharField(max_length=200)
+    achieved = models.BooleanField(default=False)
+    achieved_at = models.DateField(null=True, blank=True)
+    created_by = models.ForeignKey(User, on_delete=models.CASCADE, related_name='milestones_created')
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['target_amount']
+
+    def __str__(self):
+        return f"{self.label} - {self.company.name}"
 
 

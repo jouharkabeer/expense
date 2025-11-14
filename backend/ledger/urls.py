@@ -5,7 +5,7 @@ from .views import (
     register, login_view, current_user, refresh_token_view,
     admin_create_user, list_all_users, admin_update_user, admin_delete_user,
     CompanyViewSet, DirectorViewSet, ProjectViewSet,
-    TransactionViewSet, SalaryViewSet, summary, admin_dashboard
+    TransactionViewSet, SalaryViewSet, MilestoneViewSet, summary, admin_dashboard
 )
 
 
@@ -15,6 +15,7 @@ router.register(r'directors', DirectorViewSet, basename='director')
 router.register(r'projects', ProjectViewSet, basename='project')
 router.register(r'transactions', TransactionViewSet, basename='transaction')
 router.register(r'salaries', SalaryViewSet, basename='salary')
+router.register(r'milestones', MilestoneViewSet, basename='milestone')
 
 urlpatterns = [
     path('', include(router.urls)),

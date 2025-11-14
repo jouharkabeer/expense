@@ -1,6 +1,7 @@
 import { FormEvent, useEffect, useState } from 'react'
 import { listCompanies, createCompany, updateCompany, deleteCompany, listAllUsers, adminCreateUser, adminUpdateUser, adminDeleteUser, User, Company } from '../api'
 import { getCurrentUserSync } from '../auth'
+import Modal from '../components/Modal'
 
 export default function SuperAdmin() {
   const [user] = useState(getCurrentUserSync())
@@ -48,12 +49,17 @@ export default function SuperAdmin() {
     setSuccess(null)
     try {
       const form = e.currentTarget
-      const data = {
+      const data: any = {
         name: (form.elements.namedItem('name') as HTMLInputElement).value,
+      }
+      const incorporationDate = (form.elements.namedItem('incorporation_date') as HTMLInputElement).value
+      if (incorporationDate) {
+        data.incorporation_date = incorporationDate
       }
       await createCompany(data)
       setSuccess('Company created successfully!')
       setShowCompanyForm(false)
+      setError(null)
       loadData()
     } catch (e: any) {
       setError(e.message)
@@ -70,12 +76,17 @@ export default function SuperAdmin() {
     setSuccess(null)
     try {
       const form = e.currentTarget
-      const data = {
+      const data: any = {
         name: (form.elements.namedItem('name') as HTMLInputElement).value,
+      }
+      const incorporationDate = (form.elements.namedItem('incorporation_date') as HTMLInputElement).value
+      if (incorporationDate) {
+        data.incorporation_date = incorporationDate
       }
       await updateCompany(editingCompany.id!, data)
       setSuccess('Company updated successfully!')
       setEditingCompany(null)
+      setError(null)
       loadData()
     } catch (e: any) {
       setError(e.message)
@@ -123,6 +134,7 @@ export default function SuperAdmin() {
       setSuccess(`User "${result.user.username}" created successfully! Username: ${userForm.username}, Password: ${userForm.password}`)
       setUserForm({ username: '', email: '', password: '', phone: '', company_id: '' })
       setShowUserForm(false)
+      setError(null)
       loadData()
     } catch (e: any) {
       setError(e.message)
@@ -147,6 +159,7 @@ export default function SuperAdmin() {
       setSuccess('User updated successfully!')
       setEditingUser(null)
       setUserForm({ username: '', email: '', password: '', phone: '', company_id: '' })
+      setError(null)
       loadData()
     } catch (e: any) {
       setError(e.message)
@@ -189,22 +202,28 @@ export default function SuperAdmin() {
   }
 
   if (user?.role !== 'ADMIN' && !(user as any)?.is_staff && !(user as any)?.is_superuser) {
-    return <div className="panel"><p>Access denied. Only administrators can access this page.</p></div>
+    return (
+      <div className="panel">
+        <p style={{ textAlign: 'center', color: 'var(--text-muted)' }}>
+          Access denied. Only administrators can access this page.
+        </p>
+      </div>
+    )
   }
 
   return (
-    <div>
-      <h2 style={{ marginTop: 0 }}>SuperAdmin Panel</h2>
+    <div className="fade-in">
+      <h2>SuperAdmin Panel</h2>
 
-      <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
+      <div className="tabs">
         <button
-          className={`btn ${activeTab === 'companies' ? '' : 'secondary'}`}
+          className={`tab ${activeTab === 'companies' ? 'active' : ''}`}
           onClick={() => setActiveTab('companies')}
         >
           Companies ({companies.length})
         </button>
         <button
-          className={`btn ${activeTab === 'users' ? '' : 'secondary'}`}
+          className={`tab ${activeTab === 'users' ? 'active' : ''}`}
           onClick={() => setActiveTab('users')}
         >
           Users ({users.length})
@@ -213,41 +232,40 @@ export default function SuperAdmin() {
 
       {activeTab === 'companies' && (
         <div>
-          {!showCompanyForm && !editingCompany && (
-            <button className="btn" onClick={() => setShowCompanyForm(true)} style={{ marginBottom: 16 }}>
-              Create Company
-            </button>
-          )}
+          <button className="btn" onClick={() => { setShowCompanyForm(true); setEditingCompany(null) }} style={{ marginBottom: 24 }}>
+            Create Company
+          </button>
 
-          {showCompanyForm && (
-            <div className="panel" style={{ marginBottom: 16 }}>
-              <h3>Create Company</h3>
-              <form onSubmit={handleCreateCompany} className="form" style={{ flexDirection: 'column' }}>
-                <input className="input" name="name" placeholder="Company Name *" required />
-                <div style={{ display: 'flex', gap: 8 }}>
-                  <button className="btn" type="submit" disabled={loading}>{loading ? 'Creating...' : 'Create'}</button>
-                  <button className="btn secondary" type="button" onClick={() => setShowCompanyForm(false)}>Cancel</button>
-                </div>
-              </form>
-            </div>
-          )}
+          <Modal isOpen={showCompanyForm && !editingCompany} onClose={() => { setShowCompanyForm(false); setError(null) }} title="Create Company">
+            <form onSubmit={handleCreateCompany} className="form">
+              <input className="input" name="name" placeholder="Company Name *" required />
+              <label style={{ color: 'var(--text-secondary)', fontSize: 14, fontWeight: 500 }}>Incorporation Date</label>
+              <input className="input" name="incorporation_date" type="date" />
+              {error && <div className="message error">{error}</div>}
+              <div style={{ display: 'flex', gap: 12, marginTop: 16 }}>
+                <button className="btn" type="submit" disabled={loading} style={{ flex: 1 }}>{loading ? 'Creating...' : 'Create'}</button>
+                <button className="btn secondary" type="button" onClick={() => { setShowCompanyForm(false); setError(null) }} style={{ flex: 1 }}>Cancel</button>
+              </div>
+            </form>
+          </Modal>
 
-          {editingCompany && (
-            <div className="panel" style={{ marginBottom: 16 }}>
-              <h3>Edit Company</h3>
-              <form onSubmit={handleUpdateCompany} className="form" style={{ flexDirection: 'column' }}>
-                <input className="input" name="name" placeholder="Company Name *" required defaultValue={editingCompany.name} />
-                <div style={{ display: 'flex', gap: 8 }}>
-                  <button className="btn" type="submit" disabled={loading}>{loading ? 'Updating...' : 'Update'}</button>
-                  <button className="btn secondary" type="button" onClick={() => setEditingCompany(null)}>Cancel</button>
-                </div>
-              </form>
-            </div>
-          )}
+          <Modal isOpen={!!editingCompany} onClose={() => { setEditingCompany(null); setError(null) }} title="Edit Company">
+            <form onSubmit={handleUpdateCompany} className="form">
+              <input className="input" name="name" placeholder="Company Name *" required defaultValue={editingCompany?.name} />
+              <label style={{ color: 'var(--text-secondary)', fontSize: 14, fontWeight: 500 }}>Incorporation Date</label>
+              <input className="input" name="incorporation_date" type="date" defaultValue={editingCompany?.incorporation_date || ''} />
+              {error && <div className="message error">{error}</div>}
+              <div style={{ display: 'flex', gap: 12, marginTop: 16 }}>
+                <button className="btn" type="submit" disabled={loading} style={{ flex: 1 }}>{loading ? 'Updating...' : 'Update'}</button>
+                <button className="btn secondary" type="button" onClick={() => { setEditingCompany(null); setError(null) }} style={{ flex: 1 }}>Cancel</button>
+              </div>
+            </form>
+          </Modal>
 
           <div className="panel">
-            <h3>All Companies</h3>
-            <table>
+            <h3 style={{ marginTop: 0, marginBottom: 20 }}>All Companies</h3>
+            <div style={{ overflowX: 'auto' }}>
+              <table>
               <thead>
                 <tr>
                   <th>ID</th>
@@ -276,22 +294,19 @@ export default function SuperAdmin() {
                 ))}
               </tbody>
             </table>
+            </div>
           </div>
         </div>
       )}
 
       {activeTab === 'users' && (
         <div>
-          {!showUserForm && !editingUser && (
-            <button className="btn" onClick={() => setShowUserForm(true)} style={{ marginBottom: 16 }}>
-              Create User (Director)
-            </button>
-          )}
+          <button className="btn" onClick={() => { setShowUserForm(true); setEditingUser(null) }} style={{ marginBottom: 24 }}>
+            Create User (Director)
+          </button>
 
-          {showUserForm && (
-            <div className="panel" style={{ marginBottom: 16 }}>
-              <h3>Create User (Director)</h3>
-              <form onSubmit={handleCreateUser} className="form" style={{ flexDirection: 'column' }}>
+          <Modal isOpen={showUserForm && !editingUser} onClose={() => { setShowUserForm(false); setError(null) }} title="Create User (Director)">
+            <form onSubmit={handleCreateUser} className="form">
                 <input
                   className="input"
                   placeholder="Username *"
@@ -333,18 +348,16 @@ export default function SuperAdmin() {
                     <option key={c.id} value={c.id}>{c.name}</option>
                   ))}
                 </select>
-                <div style={{ display: 'flex', gap: 8 }}>
-                  <button className="btn" type="submit" disabled={loading}>{loading ? 'Creating...' : 'Create User'}</button>
-                  <button className="btn secondary" type="button" onClick={() => setShowUserForm(false)}>Cancel</button>
+                {error && <div className="message error">{error}</div>}
+                <div style={{ display: 'flex', gap: 12, marginTop: 16 }}>
+                  <button className="btn" type="submit" disabled={loading} style={{ flex: 1 }}>{loading ? 'Creating...' : 'Create User'}</button>
+                  <button className="btn secondary" type="button" onClick={() => { setShowUserForm(false); setError(null) }} style={{ flex: 1 }}>Cancel</button>
                 </div>
               </form>
-            </div>
-          )}
+          </Modal>
 
-          {editingUser && (
-            <div className="panel" style={{ marginBottom: 16 }}>
-              <h3>Edit User</h3>
-              <form onSubmit={handleUpdateUser} className="form" style={{ flexDirection: 'column' }}>
+          <Modal isOpen={!!editingUser} onClose={() => { setEditingUser(null); setError(null) }} title="Edit User">
+            <form onSubmit={handleUpdateUser} className="form">
                 <input
                   className="input"
                   placeholder="Username *"
@@ -367,20 +380,22 @@ export default function SuperAdmin() {
                   value={userForm.phone}
                   onChange={(e) => setUserForm({ ...userForm, phone: e.target.value })}
                 />
-                <div style={{ display: 'flex', gap: 8 }}>
-                  <button className="btn" type="submit" disabled={loading}>{loading ? 'Updating...' : 'Update'}</button>
+                {error && <div className="message error">{error}</div>}
+                <div style={{ display: 'flex', gap: 12, marginTop: 16 }}>
+                  <button className="btn" type="submit" disabled={loading} style={{ flex: 1 }}>{loading ? 'Updating...' : 'Update'}</button>
                   <button className="btn secondary" type="button" onClick={() => {
                     setEditingUser(null)
                     setUserForm({ username: '', email: '', password: '', phone: '', company_id: '' })
-                  }}>Cancel</button>
+                    setError(null)
+                  }} style={{ flex: 1 }}>Cancel</button>
                 </div>
               </form>
-            </div>
-          )}
+          </Modal>
 
           <div className="panel">
-            <h3>All Users</h3>
-            <table>
+            <h3 style={{ marginTop: 0, marginBottom: 20 }}>All Users</h3>
+            <div style={{ overflowX: 'auto' }}>
+              <table>
               <thead>
                 <tr>
                   <th>ID</th>
@@ -417,12 +432,13 @@ export default function SuperAdmin() {
                 ))}
               </tbody>
             </table>
+            </div>
           </div>
         </div>
       )}
 
-      {error && <div style={{ color: '#ff7a90', marginTop: 12, padding: 12, background: '#2a1f2a', borderRadius: 8 }}>{error}</div>}
-      {success && <div style={{ color: '#1fb978', marginTop: 12, padding: 12, background: '#1a2a1f', borderRadius: 8 }}>{success}</div>}
+      {error && <div className="message error">{error}</div>}
+      {success && <div className="message success">{success}</div>}
     </div>
   )
 }

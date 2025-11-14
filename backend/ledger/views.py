@@ -10,14 +10,14 @@ from rest_framework_simplejwt.tokens import RefreshToken
 
 from .models import (
     User, Company, Director, Project, ProjectApproval,
-    Transaction, TransactionApproval, Salary
+    Transaction, TransactionApproval, Salary, Milestone
 )
 from .serializers import (
     UserSerializer, UserRegistrationSerializer, LoginSerializer, AdminCreateUserSerializer,
     CompanySerializer, DirectorSerializer,
     ProjectSerializer, ProjectApprovalSerializer,
     TransactionSerializer, TransactionApprovalSerializer,
-    SalarySerializer
+    SalarySerializer, MilestoneSerializer
 )
 
 
@@ -331,6 +331,11 @@ class TransactionViewSet(viewsets.ModelViewSet):
         elif transaction.all_approved:
             transaction.status = 'APPROVED'
             transaction.save()
+        
+        # Check milestones if this is an approved income transaction
+        if transaction.status == 'APPROVED' and transaction.transaction_type == 'INCOME':
+            check_and_update_milestones(transaction.company)
+        
         return Response(TransactionSerializer(transaction).data)
 
     @action(detail=True, methods=['post'])
@@ -369,6 +374,57 @@ class SalaryViewSet(viewsets.ModelViewSet):
         if company.created_by != user and not Director.objects.filter(company=company, user=user).exists() and user.role != 'ADMIN':
             return Response({'error': 'Not authorized'}, status=status.HTTP_403_FORBIDDEN)
         serializer.save(created_by=user, status='PENDING')
+
+
+def check_and_update_milestones(company):
+    """Check and update milestones when income is approved"""
+    from django.db.models import Sum
+    total_income = Transaction.objects.filter(
+        company=company,
+        transaction_type='INCOME',
+        status='APPROVED'
+    ).aggregate(Sum('amount'))['amount__sum'] or Decimal('0')
+    
+    # Check incomplete milestones
+    incomplete_milestones = Milestone.objects.filter(
+        company=company,
+        achieved=False
+    )
+    
+    for milestone in incomplete_milestones:
+        if float(total_income) >= float(milestone.target_amount):
+            milestone.achieved = True
+            milestone.achieved_at = date_class.today()
+            milestone.save()
+
+
+# Milestone Views
+class MilestoneViewSet(viewsets.ModelViewSet):
+    serializer_class = MilestoneSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        company_id = self.request.query_params.get('company')
+        qs = Milestone.objects.all()
+        if company_id:
+            qs = qs.filter(company_id=company_id)
+        user = self.request.user
+        if user.role == 'ADMIN':
+            return qs
+        elif user.role == 'COMPANY':
+            return qs.filter(company__created_by=user)
+        elif user.role == 'DIRECTOR':
+            return qs.filter(company__directors__user=user)
+        return qs.none()
+
+    def perform_create(self, serializer):
+        company = serializer.validated_data['company']
+        user = self.request.user
+        if company.created_by != user and not Director.objects.filter(company=company, user=user).exists() and user.role != 'ADMIN':
+            return Response({'error': 'Not authorized'}, status=status.HTTP_403_FORBIDDEN)
+        milestone = serializer.save(created_by=user)
+        # Check if milestone is already achieved
+        check_and_update_milestones(company)
 
 
 # Admin Dashboard View
@@ -464,32 +520,47 @@ def summary(request):
     
     total_balance = partner1 + partner2 + company_bal
 
-    # Milestones
-    milestones = []
-    milestones_data = [
-        {'target': 100000, 'label': '1 Lakh'},
-        {'target': 500000, 'label': '5 Lakh'},
-        {'target': 1000000, 'label': '10 Lakh'},
-    ]
-    start_date = date_class(2025, 6, 16)
+    # Get last 3 incomplete milestones
+    incomplete_milestones = Milestone.objects.filter(
+        company=company,
+        achieved=False
+    ).order_by('target_amount')[:3]
     
-    for milestone in milestones_data:
-        if income_total >= milestone['target']:
-            days_taken = (date_class.today() - start_date).days
-            milestones.append({
-                'target': milestone['target'],
-                'label': milestone['label'],
-                'achieved': True,
-                'days_taken': days_taken,
-                'achieved_date': start_date.isoformat() if days_taken == 0 else None
-            })
-        else:
-            milestones.append({
-                'target': milestone['target'],
-                'label': milestone['label'],
-                'achieved': False,
-                'progress': float(income_total / milestone['target'] * 100)
-            })
+    milestones_list = []
+    for milestone in incomplete_milestones:
+        # Calculate progress
+        progress = 0
+        if milestone.target_amount > 0:
+            progress = min(100, (float(income_total) / float(milestone.target_amount)) * 100)
+        
+        milestones_list.append({
+            'id': milestone.id,
+            'target': float(milestone.target_amount),
+            'label': milestone.label,
+            'achieved': False,
+            'progress': progress,
+        })
+    
+    # Also include achieved milestones that were recently completed (last 3)
+    achieved_milestones = Milestone.objects.filter(
+        company=company,
+        achieved=True
+    ).order_by('-achieved_at')[:3]
+    
+    for milestone in achieved_milestones:
+        days_taken = None
+        if milestone.achieved_at and company.incorporation_date:
+            delta = milestone.achieved_at - company.incorporation_date
+            days_taken = delta.days
+        
+        milestones_list.append({
+            'id': milestone.id,
+            'target': float(milestone.target_amount),
+            'label': milestone.label,
+            'achieved': True,
+            'days_taken': days_taken,
+            'achieved_at': milestone.achieved_at.isoformat() if milestone.achieved_at else None,
+        })
 
     return Response({
         'income_total': str(income_total),
@@ -500,6 +571,6 @@ def summary(request):
         'partner2_balance': str(partner2),
         'company_balance': str(company_bal),
         'director_balances': director_balances,
-        'milestones': milestones,
+        'milestones': milestones_list,
         'today': date_class.today().isoformat(),
     })
