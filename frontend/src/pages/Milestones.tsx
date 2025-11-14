@@ -10,6 +10,7 @@ export default function Milestones() {
   const [selectedCompany, setSelectedCompany] = useState<number | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
+  const [loadingMilestones, setLoadingMilestones] = useState(false)
   const [showModal, setShowModal] = useState(false)
   const [editingMilestone, setEditingMilestone] = useState<Milestone | null>(null)
   const [milestoneForm, setMilestoneForm] = useState({ target_amount: '', label: '' })
@@ -38,11 +39,14 @@ export default function Milestones() {
 
   async function loadMilestones() {
     if (!selectedCompany) return
+    setLoadingMilestones(true)
     try {
       const ms = await listMilestones(selectedCompany)
       setMilestones(ms)
     } catch (e: any) {
       setError(e.message)
+    } finally {
+      setLoadingMilestones(false)
     }
   }
 
@@ -154,7 +158,12 @@ export default function Milestones() {
 
       <div className="panel">
         <h3 style={{ marginTop: 0, marginBottom: 20 }}>All Milestones</h3>
-        {milestones.length === 0 ? (
+        {loadingMilestones ? (
+          <div style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)' }}>
+            <div className="loader"></div>
+            <p style={{ marginTop: 16 }}>Loading milestones...</p>
+          </div>
+        ) : milestones.length === 0 ? (
           <p style={{ textAlign: 'center', color: 'var(--text-muted)', padding: '40px' }}>
             No milestones yet. Create your first milestone!
           </p>

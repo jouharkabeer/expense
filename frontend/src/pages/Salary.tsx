@@ -1,5 +1,5 @@
 import { FormEvent, useEffect, useState } from 'react'
-import { Account, listSalaries, createSalary, listCompanies, listDirectors, Salary as SalaryType, Company, Director } from '../api'
+import { Account, listSalaries, createSalary, listCompanies, listDirectors, Salary as SalaryType, Company, Director, approveSalary, rejectSalary } from '../api'
 import { getCurrentUserSync } from '../auth'
 import Modal from '../components/Modal'
 
@@ -10,6 +10,7 @@ export default function Salary() {
   const [salaries, setSalaries] = useState<SalaryType[]>([])
   const [selectedCompany, setSelectedCompany] = useState<number | null>(null)
   const [loading, setLoading] = useState(false)
+  const [loadingSalaries, setLoadingSalaries] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [showModal, setShowModal] = useState(false)
   const [form, setForm] = useState<Pick<SalaryType, 'amount' | 'description' | 'date' | 'account' | 'director'>>({
@@ -70,11 +71,14 @@ export default function Salary() {
 
   async function loadSalaries() {
     if (!selectedCompany) return
+    setLoadingSalaries(true)
     try {
       const sals = await listSalaries(selectedCompany)
       setSalaries(sals)
     } catch (e: any) {
       setError(e.message)
+    } finally {
+      setLoadingSalaries(false)
     }
   }
 
@@ -93,11 +97,29 @@ export default function Salary() {
       } as SalaryType)
       setForm({ amount: '', description: '', date: new Date().toISOString().slice(0, 10), account: 'COMPANY', director: directors[0]?.id || 0 })
       setShowModal(false)
-      loadSalaries()
+      await loadSalaries()
     } catch (e: any) {
       setError(e.message)
     } finally {
       setLoading(false)
+    }
+  }
+
+  async function handleApprove(id: number) {
+    try {
+      await approveSalary(id)
+      await loadSalaries()
+    } catch (e: any) {
+      setError((e as Error).message)
+    }
+  }
+
+  async function handleReject(id: number) {
+    try {
+      await rejectSalary(id)
+      await loadSalaries()
+    } catch (e: any) {
+      setError((e as Error).message)
     }
   }
 
@@ -165,48 +187,64 @@ export default function Salary() {
 
       <div className="panel">
         <h3 style={{ marginTop: 0, marginBottom: 20 }}>Salary Transactions</h3>
-        <div style={{ overflowX: 'auto' }}>
-          <table>
-            <thead>
-              <tr>
-                <th>Date</th>
-                <th>Director</th>
-                <th>Amount</th>
-                <th>Description</th>
-                <th>Account</th>
-                <th>Status</th>
-              </tr>
-            </thead>
-            <tbody>
-              {salaries.length === 0 ? (
+        {loadingSalaries ? (
+          <div style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)' }}>
+            <div className="loader"></div>
+            <p style={{ marginTop: 16 }}>Loading salaries...</p>
+          </div>
+        ) : (
+          <div style={{ overflowX: 'auto' }}>
+            <table>
+              <thead>
                 <tr>
-                  <td colSpan={6} style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)' }}>
-                    No salary transactions yet
-                  </td>
+                  <th>Date</th>
+                  <th>Director</th>
+                  <th>Amount</th>
+                  <th>Description</th>
+                  <th>Account</th>
+                  <th>Status</th>
+                  <th>Actions</th>
                 </tr>
-              ) : (
-                salaries.map(s => (
-                  <tr key={s.id}>
-                    <td>{s.date}</td>
-                    <td style={{ fontWeight: 600 }}>{s.director_name}</td>
-                    <td style={{ fontWeight: 600, color: 'var(--warning)' }}>₹ {Number(s.amount).toFixed(2)}</td>
-                    <td>{s.description || '-'}</td>
-                    <td>
-                      <span className={`chip ${s.account === 'PARTNER1' ? 'p1' : s.account === 'PARTNER2' ? 'p2' : 'company'}`}>
-                        {getAccountLabel(s.account)}
-                      </span>
-                    </td>
-                    <td>
-                      <span className={`chip ${s.status === 'APPROVED' ? 'company' : s.status === 'REJECTED' ? 'p2' : 'p1'}`}>
-                        {s.status}
-                      </span>
+              </thead>
+              <tbody>
+                {salaries.length === 0 ? (
+                  <tr>
+                    <td colSpan={7} style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)' }}>
+                      No salary transactions yet
                     </td>
                   </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
+                ) : (
+                  salaries.map(s => (
+                    <tr key={s.id}>
+                      <td>{s.date}</td>
+                      <td style={{ fontWeight: 600 }}>{s.director_name}</td>
+                      <td style={{ fontWeight: 600, color: 'var(--warning)' }}>₹ {Number(s.amount).toFixed(2)}</td>
+                      <td>{s.description || '-'}</td>
+                      <td>
+                        <span className={`chip ${s.account === 'PARTNER1' ? 'p1' : s.account === 'PARTNER2' ? 'p2' : 'company'}`}>
+                          {getAccountLabel(s.account)}
+                        </span>
+                      </td>
+                      <td>
+                        <span className={`chip ${s.status === 'APPROVED' ? 'company' : s.status === 'REJECTED' ? 'p2' : 'p1'}`}>
+                          {s.status}
+                        </span>
+                      </td>
+                      <td>
+                        {s.status === 'PENDING' && user && s.created_by !== user.id && (
+                          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                            <button className="btn secondary small" onClick={() => handleApprove(s.id!)}>Approve</button>
+                            <button className="btn danger small" onClick={() => handleReject(s.id!)}>Reject</button>
+                          </div>
+                        )}
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
     </div>
   )

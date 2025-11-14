@@ -228,7 +228,18 @@ class MilestoneSerializer(serializers.ModelSerializer):
         return 0
 
     def get_days_taken(self, obj):
-        if obj.achieved and obj.achieved_at and obj.company.incorporation_date:
-            delta = obj.achieved_at - obj.company.incorporation_date
-            return delta.days
+        if obj.achieved and obj.achieved_at:
+            # Calculate days from incorporation date to achievement date
+            if obj.company.incorporation_date:
+                delta = obj.achieved_at - obj.company.incorporation_date
+                return delta.days
+            # If no incorporation date, calculate from first income transaction
+            first_income = Transaction.objects.filter(
+                company=obj.company,
+                transaction_type='INCOME',
+                status='APPROVED'
+            ).order_by('date').first()
+            if first_income:
+                delta = obj.achieved_at - first_income.date
+                return delta.days
         return None

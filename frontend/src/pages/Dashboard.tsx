@@ -67,7 +67,12 @@ export default function Dashboard() {
 
   // Admin Dashboard
   if (isAdmin) {
-    if (!adminStats) return <div className="loading">Loading...</div>
+    if (!adminStats) return (
+      <div className="loading">
+        <div className="loader"></div>
+        <p style={{ marginTop: 16 }}>Loading dashboard...</p>
+      </div>
+    )
     
     return (
       <div className="fade-in">
@@ -82,7 +87,12 @@ export default function Dashboard() {
 
   // Director Dashboard
   if (loadingCompanies) {
-    return <div className="loading">Loading...</div>
+    return (
+      <div className="loading">
+        <div className="loader"></div>
+        <p style={{ marginTop: 16 }}>Loading companies...</p>
+      </div>
+    )
   }
   
   if (companies.length === 0) {
@@ -95,7 +105,12 @@ export default function Dashboard() {
     )
   }
 
-  if (!summary) return <div className="loading">Loading summary...</div>
+  if (!summary) return (
+    <div className="loading">
+      <div className="loader"></div>
+      <p style={{ marginTop: 16 }}>Loading summary...</p>
+    </div>
+  )
 
   return (
     <div className="fade-in">

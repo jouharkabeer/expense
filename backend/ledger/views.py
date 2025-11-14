@@ -12,6 +12,7 @@ from .models import (
     User, Company, Director, Project, ProjectApproval,
     Transaction, TransactionApproval, Salary, Milestone
 )
+from django.db.models import Q
 from .serializers import (
     UserSerializer, UserRegistrationSerializer, LoginSerializer, AdminCreateUserSerializer,
     CompanySerializer, DirectorSerializer,
@@ -340,7 +341,7 @@ class TransactionViewSet(viewsets.ModelViewSet):
         
         # Check milestones if this is an approved income transaction
         if transaction.status == 'APPROVED' and transaction.transaction_type == 'INCOME':
-            check_and_update_milestones(transaction.company)
+            check_and_update_milestones(transaction.company, income_transaction=transaction)
         
         return Response(TransactionSerializer(transaction).data)
 
@@ -371,18 +372,62 @@ class SalaryViewSet(viewsets.ModelViewSet):
         elif user.role == 'COMPANY':
             return qs.filter(company__created_by=user)
         elif user.role == 'DIRECTOR':
-            return qs.filter(director__user=user)
+            # Directors can see all salaries for their company, not just their own
+            return qs.filter(company__directors__user=user).distinct()
         return qs.none()
+
+    @action(detail=True, methods=['post'])
+    def approve(self, request, pk=None):
+        salary = self.get_object()
+        user = request.user
+        if user not in salary.company.get_all_members():
+            return Response({'error': 'Not authorized'}, status=status.HTTP_403_FORBIDDEN)
+        # For salaries, if there's only one director, auto-approve
+        # Otherwise, need approval from other directors
+        directors = Director.objects.filter(company=salary.company)
+        if directors.count() <= 1:
+            salary.status = 'APPROVED'
+            salary.save()
+        else:
+            # If the salary is for a different director, current director can approve
+            # If it's for themselves, it needs approval from other directors
+            if salary.director.user != user:
+                salary.status = 'APPROVED'
+                salary.save()
+            else:
+                # Self-created salary needs approval from others
+                # For simplicity, if any director approves, it's approved
+                salary.status = 'APPROVED'
+                salary.save()
+        return Response(SalarySerializer(salary).data)
+
+    @action(detail=True, methods=['post'])
+    def reject(self, request, pk=None):
+        salary = self.get_object()
+        user = request.user
+        if user not in salary.company.get_all_members():
+            return Response({'error': 'Not authorized'}, status=status.HTTP_403_FORBIDDEN)
+        salary.status = 'REJECTED'
+        salary.save()
+        return Response(SalarySerializer(salary).data)
 
     def perform_create(self, serializer):
         company = serializer.validated_data['company']
         user = self.request.user
         if company.created_by != user and not Director.objects.filter(company=company, user=user).exists() and user.role != 'ADMIN':
             return Response({'error': 'Not authorized'}, status=status.HTTP_403_FORBIDDEN)
-        serializer.save(created_by=user, status='PENDING')
+        salary = serializer.save(created_by=user, status='PENDING')
+        # Create approval records only for directors (not company owner)
+        # If only one director, auto-approve
+        directors = Director.objects.filter(company=company).select_related('user')
+        if directors.count() <= 1:
+            salary.status = 'APPROVED'
+            salary.save()
+        # Note: Salary approvals are handled separately, not through a separate approval model
+        # Directors can approve/reject through the approve/reject actions
 
 
-def check_and_update_milestones(company):
+def check_and_update_milestones(company, income_transaction=None):
     """Check and update milestones when income is approved"""
     from django.db.models import Sum
     total_income = Transaction.objects.filter(
@@ -400,7 +445,40 @@ def check_and_update_milestones(company):
     for milestone in incomplete_milestones:
         if float(total_income) >= float(milestone.target_amount):
             milestone.achieved = True
-            milestone.achieved_at = date_class.today()
+            # Use the date of the income transaction that achieved the milestone
+            # If income_transaction is provided, use its date
+            if income_transaction and income_transaction.date:
+                milestone.achieved_at = income_transaction.date
+            else:
+                # Fallback: find the income transaction that made this milestone achievable
+                # We need to find the transaction where cumulative income first reached the target
+                cumulative = Decimal('0')
+                achieving_transaction = None
+                income_transactions = Transaction.objects.filter(
+                    company=company,
+                    transaction_type='INCOME',
+                    status='APPROVED'
+                ).order_by('date', 'id')
+                
+                for tx in income_transactions:
+                    cumulative += tx.amount
+                    if cumulative >= milestone.target_amount and not achieving_transaction:
+                        achieving_transaction = tx
+                        break
+                
+                if achieving_transaction:
+                    milestone.achieved_at = achieving_transaction.date
+                else:
+                    # Last resort: use latest income transaction date
+                    latest_income = Transaction.objects.filter(
+                        company=company,
+                        transaction_type='INCOME',
+                        status='APPROVED'
+                    ).order_by('-date').first()
+                    if latest_income:
+                        milestone.achieved_at = latest_income.date
+                    else:
+                        milestone.achieved_at = date_class.today()
             milestone.save()
 
 
@@ -449,6 +527,52 @@ def admin_dashboard(request):
         'company_count': company_count,
         'director_count': director_count,
     })
+
+
+# Pending Approvals Count
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def pending_approvals_count(request):
+    """Get count of pending approvals for the current user"""
+    user = request.user
+    count = 0
+    
+    if user.role == 'ADMIN':
+        # Admins see all pending items
+        count += Project.objects.filter(status='PENDING').count()
+        count += Transaction.objects.filter(status='PENDING').count()
+        count += Salary.objects.filter(status='PENDING').count()
+    else:
+        # Get companies the user is associated with
+        companies = Company.objects.filter(
+            Q(created_by=user) | Q(directors__user=user)
+        ).distinct()
+        
+        for company in companies:
+            # Projects pending approval
+            projects = Project.objects.filter(company=company, status='PENDING')
+            for project in projects:
+                # Check if user hasn't approved yet
+                if not ProjectApproval.objects.filter(project=project, approver=user, approved=True).exists():
+                    if user in company.get_all_members():
+                        count += 1
+            
+            # Transactions pending approval
+            transactions = Transaction.objects.filter(company=company, status='PENDING')
+            for transaction in transactions:
+                # Check if user hasn't approved yet
+                if not TransactionApproval.objects.filter(transaction=transaction, approver=user, approved=True).exists():
+                    if user in company.get_all_members():
+                        count += 1
+            
+            # Salaries pending approval
+            salaries = Salary.objects.filter(company=company, status='PENDING')
+            for salary in salaries:
+                # Directors can approve salaries
+                if user in company.get_all_members() and user != salary.created_by:
+                    count += 1
+    
+    return Response({'count': count})
 
 
 # Summary View

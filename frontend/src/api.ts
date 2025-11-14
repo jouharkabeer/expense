@@ -547,3 +547,27 @@ export async function getAdminDashboard(): Promise<{ company_count: number; dire
   if (!res.ok) throw new Error('Failed to load admin dashboard')
   return res.json()
 }
+
+// Pending Approvals Count API
+export async function getPendingApprovalsCount(): Promise<{ count: number }> {
+  const res = await authFetch(BASE_URL + '/pending-approvals-count/')
+  if (!res.ok) throw new Error('Failed to load pending approvals count')
+  return res.json()
+}
+
+// Salary Approval APIs
+export async function approveSalary(id: number): Promise<Salary> {
+  const res = await authFetch(BASE_URL + `/salaries/${id}/approve/`, {
+    method: 'POST',
+  })
+  if (!res.ok) throw new Error('Failed to approve salary')
+  return res.json()
+}
+
+export async function rejectSalary(id: number): Promise<Salary> {
+  const res = await authFetch(BASE_URL + `/salaries/${id}/reject/`, {
+    method: 'POST',
+  })
+  if (!res.ok) throw new Error('Failed to reject salary')
+  return res.json()
+}

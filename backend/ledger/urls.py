@@ -5,7 +5,8 @@ from .views import (
     register, login_view, current_user, refresh_token_view,
     admin_create_user, list_all_users, admin_update_user, admin_delete_user,
     CompanyViewSet, DirectorViewSet, ProjectViewSet,
-    TransactionViewSet, SalaryViewSet, MilestoneViewSet, summary, admin_dashboard
+    TransactionViewSet, SalaryViewSet, MilestoneViewSet, summary, admin_dashboard,
+    pending_approvals_count
 )
 
 
@@ -29,4 +30,5 @@ urlpatterns = [
     path('admin/users/<int:user_id>/delete/', admin_delete_user, name='admin_delete_user'),
     path('admin/dashboard/', admin_dashboard, name='admin_dashboard'),
     path('summary/', summary, name='summary'),
+    path('pending-approvals-count/', pending_approvals_count, name='pending_approvals_count'),
 ]

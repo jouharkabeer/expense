@@ -19,6 +19,7 @@ export default function Expense() {
     is_project_related: false,
   })
   const [loading, setLoading] = useState(false)
+  const [loadingItems, setLoadingItems] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [showModal, setShowModal] = useState(false)
 
@@ -78,9 +79,17 @@ export default function Expense() {
     return account === 'PARTNER1' ? 'Jouhar' : account === 'PARTNER2' ? 'Aleena' : 'Company Account'
   }
 
-  function load() {
+  async function load() {
     if (!selectedCompany) return
-    listTransactions(selectedCompany, 'EXPENSE').then(setItems).catch((e) => setError((e as Error).message))
+    setLoadingItems(true)
+    try {
+      const items = await listTransactions(selectedCompany, 'EXPENSE')
+      setItems(items)
+    } catch (e) {
+      setError((e as Error).message)
+    } finally {
+      setLoadingItems(false)
+    }
   }
 
   async function onSubmit(e: FormEvent) {
@@ -202,8 +211,14 @@ export default function Expense() {
 
       <div className="panel">
         <h3 style={{ marginTop: 0, marginBottom: 20 }}>Expense Transactions</h3>
-        <div style={{ overflowX: 'auto' }}>
-          <table>
+        {loadingItems ? (
+          <div style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)' }}>
+            <div className="loader"></div>
+            <p style={{ marginTop: 16 }}>Loading transactions...</p>
+          </div>
+        ) : (
+          <div style={{ overflowX: 'auto' }}>
+            <table>
             <thead>
               <tr>
                 <th>Date</th>
@@ -257,6 +272,7 @@ export default function Expense() {
             </tbody>
           </table>
         </div>
+        )}
       </div>
     </div>
   )

@@ -1,15 +1,35 @@
 import { Link, NavLink, useNavigate, useLocation } from 'react-router-dom'
 import { getCurrentUserSync, logout } from '../auth'
 import { useEffect, useState } from 'react'
+import { getPendingApprovalsCount } from '../api'
 
 export default function Nav() {
   const [user, setUser] = useState(getCurrentUserSync())
+  const [pendingCount, setPendingCount] = useState(0)
   const navigate = useNavigate()
   const location = useLocation()
 
   useEffect(() => {
     setUser(getCurrentUserSync())
   }, [location])
+
+  useEffect(() => {
+    if (user) {
+      loadPendingCount()
+      // Refresh pending count every 30 seconds
+      const interval = setInterval(loadPendingCount, 30000)
+      return () => clearInterval(interval)
+    }
+  }, [user, location])
+
+  async function loadPendingCount() {
+    try {
+      const data = await getPendingApprovalsCount()
+      setPendingCount(data.count)
+    } catch (e) {
+      // Silently fail - don't show error for notification count
+    }
+  }
 
   async function handleLogout() {
     await logout()
@@ -68,9 +88,44 @@ export default function Nav() {
             )}
           </nav>
           {user && (
-            <button className="btn secondary" onClick={handleLogout} style={{ fontSize: '14px', padding: '10px 16px' }}>
-              Logout
-            </button>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+              {pendingCount > 0 && (
+                <button 
+                  className="btn secondary" 
+                  onClick={() => navigate('/')}
+                  style={{ 
+                    fontSize: '14px', 
+                    padding: '10px 16px',
+                    position: 'relative'
+                  }}
+                  title={`${pendingCount} pending approval${pendingCount > 1 ? 's' : ''}`}
+                >
+                  🔔
+                  {pendingCount > 0 && (
+                    <span style={{
+                      position: 'absolute',
+                      top: '-4px',
+                      right: '-4px',
+                      background: 'var(--danger)',
+                      color: 'white',
+                      borderRadius: '50%',
+                      width: '20px',
+                      height: '20px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      fontSize: '11px',
+                      fontWeight: 'bold'
+                    }}>
+                      {pendingCount > 9 ? '9+' : pendingCount}
+                    </span>
+                  )}
+                </button>
+              )}
+              <button className="btn secondary" onClick={handleLogout} style={{ fontSize: '14px', padding: '10px 16px' }}>
+                Logout
+              </button>
+            </div>
           )}
         </div>
       </div>
